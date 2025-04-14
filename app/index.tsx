@@ -22,16 +22,6 @@ export default function QRScannerScreen() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
 
-  const handleLocation = () => {
-    // Navigate to the workout details screen with params
-    router.push({
-      pathname: './gameMap',
-      params: {
-        l
-      }
-    });
-  };
-
   if (!permission) {
     // Camera permissions are still loading.
     return <View />;
@@ -107,18 +97,18 @@ export default function QRScannerScreen() {
       
       // Validate we have coordinates
       if (locationData && locationData.latitude && locationData.longitude) {
-            router.push({
-              pathname: './gameMap',
-              params: locationData
-            });
-        } else {
-          Alert.alert("Invalid QR Code", "Missing location coordinates.");
-        }
-        }
+        setTimeout(() => {
+          const queryParams = `latitude=${locationData.latitude}&longitude=${locationData.longitude}&name=${encodeURIComponent(locationData.name || 'Location from QR Code')}`;
+          router.push(`/gameMap?${queryParams}`);
+        }, 100);
+      } else {
+        Alert.alert("Invalid QR Code", "Missing location coordinates.");
       }
     } catch (error) {
       Alert.alert("Error", "An error occurred while processing the QR code.");
     }
+  };
+
   return (
     <View style={styles.container}>
     <CameraView style={styles.camera} facing={facing} barcodeScannerSettings={{

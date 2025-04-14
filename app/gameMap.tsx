@@ -5,22 +5,29 @@ import { StyleSheet, View, Text, TouchableOpacity, Alert, Dimensions } from 'rea
 import MapView, { Marker, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
-import { useSearchParams } from 'expo-router/build/hooks';
+import { useLocalSearchParams } from 'expo-router';
 
 export default function GameMapScreen() {
-  const searchParams = useSearchParams();
-  const targetLocation = JSON.parse(searchParams.get('targetLocation') || '{}');
+  const params = useLocalSearchParams();
+  console.log("Raw params received:", params);
+  
+  const targetLocation = {
+    latitude: parseFloat(params.latitude || 0),
+    longitude: parseFloat(params.longitude || 0),
+    name: params.name || 'Unknown Location'
+  };
+  console.log("Target location initialized:", targetLocation);
   const router = useRouter();
-  const [currentLocation, setCurrentLocation] = useState(null);
-  const [lastDistance, setLastDistance] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [lastDistance, setLastDistance] = useState<number | 0>(0);
   const [feedback, setFeedback] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sound, setSound] = useState();
   const mapRef = useRef(null);
   
-  // const warmerSound = require('../assets/sounds/warmer.mp3');
-  // const colderSound = require('../assets/sounds/colder.mp3');
-  // const victorySound = require('../assets/sounds/victory.mp3');
+  const warmerSound = require('../assets/sounds/success.wav');
+  const colderSound = require('../assets/sounds/fail.wav');
+  const victorySound = require('../assets/sounds/woo.m4a');
   
   // Distance calculation function (Haversine formula)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -57,6 +64,7 @@ export default function GameMapScreen() {
     (async () => {
       // Request location permissions
       let { status } = await Location.requestForegroundPermissionsAsync();
+      console.log("Location permission status:", status);
       if (status !== 'granted') {
         Alert.alert('Permission denied', 'Location permission is required for this game.');
         return;
@@ -64,9 +72,11 @@ export default function GameMapScreen() {
 
       // Get current location
       let location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High
+        accuracy: Location.Accuracy.High,
       });
-      
+      console.log("Initial location:", location);
+
+
       setCurrentLocation({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -79,10 +89,15 @@ export default function GameMapScreen() {
           distanceInterval: 1, // Update every 1 meter
         },
         (location) => {
+          console.log("Location update from watcher:", location); 
           setCurrentLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           });
+        },
+        (error) => {
+          console.error('Location watch error:', error);
+          setIsLoading(false);
         }
       );
       
@@ -97,7 +112,9 @@ export default function GameMapScreen() {
 
   // Check proximity when user clicks the button
   const checkProximity = () => {
+    console.log("Checking proximity...");
     if (!currentLocation) return;
+
     
     const distance = calculateDistance(
       currentLocation.latitude,
@@ -107,6 +124,7 @@ export default function GameMapScreen() {
     );
     
     // Victory condition
+    console.log(`Current location: ${currentLocation.latitude}, ${currentLocation.longitude}`)
     if (distance < 10) {
       playSound(victorySound);
       Alert.alert(
@@ -124,9 +142,13 @@ export default function GameMapScreen() {
       setFeedback("Move around to get closer!");
     } else if (distance < lastDistance) {
       setFeedback("Getting warmer! You're moving closer.");
+      console.log(`Distance: ${distance} meters`);
+      console.log('Target location: ', targetLocation)
       playSound(warmerSound);
     } else {
       setFeedback("Getting colder! Try another direction.");
+      console.log(`Distance: ${distance} meters`);
+      console.log('Target location: ', targetLocation)
       playSound(colderSound);
     }
     
@@ -199,7 +221,7 @@ const styles = StyleSheet.create({
   },
   map: {
     width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height - 200,
+    height: Dimensions.get('window').height - 300,
   },
   feedbackContainer: {
     backgroundColor: '#f0f0f0',
